@@ -3,84 +3,85 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\EditFileRequest;
+use App\Http\Requests\StoreFileRequest;
+use App\Http\Resources\FileResource;
 use App\Models\File;
 use App\Models\Permission;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Symfony\Component\HttpFoundation\File\Exception\FileException;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FileController extends Controller
 {
     private function getFilePath(string $name): string
     {
-        return public_path('uploads') . '/' . $name;
+        return Storage::disk('local')->path('uploads/' . $name);
     }
     private function getFileName(mixed $file): string
     {
-        $count = 1;
+        $files = File::all()->pluck('name');
         $name = $file->getClientOriginalName();
-        $originalName = $name;
-        $dir = scandir(public_path('uploads'));
 
-        while (in_array($name, $dir)){
-            $name = explode('.', $originalName)[0] . '(' . $count . ').' . $file->extension();
-            $count++;
+        if (!$files->contains($name)) {
+            return $name;
         }
 
-        return $name;
+        $fileInfo = pathinfo($name);
+        $i = 1;
+        while ($files->contains("$fileInfo[filename] ($i).$fileInfo[extension]")) {
+            $i++;
+        }
+        return "$fileInfo[filename] ($i).$fileInfo[extension]";
     }
 
-    public function store(Request $request)
+    public function store(StoreFileRequest $request): Collection
     {
-        $request->validate([
-            'files' => 'required',
-            'files.*' => 'required|mimes:doc,pdf,docx,zip,jpeg,jpg,png|max:2048',
-        ]);
-
-        $response = [];
         $files = $request->file('files');
         if (!is_array($files)){
             $files = array($files);
         }
-        foreach($files as $key => $file)
-        {
-            try {
-                $file_name = $this->getFileName($file);;
-                $file_id = bin2hex(random_bytes(10));
-                $file->move(public_path('uploads'), $file_name);
-                $created_file = File::create([
-                    'name' => $file_name,
-                    'user_id' => Auth::id(),
-                    'file_id' => $file_id
-                ]);
-                Permission::createAuthor(Auth::id(), $created_file->id);
-                $response[] = [
-                    'success' => true,
-                    'code' => 200,
-                    'message' => 'Success',
-                    'name' => $file_name,
-                    'file_id' => $file_id,
-                    'url' => $_SERVER['HTTP_HOST'] . '/files/' . $file_id
-                ];
-            } catch (FileException $e) {
-                $response[] = [
+
+        return collect($files)->map(function($file){
+            $validator = Validator::make(['file' => $file],
+                ['file' => ['mimes:doc,pdf,docx,zip,jpeg,jpg,png', 'max:2048']]);
+
+            if ($validator->fails()) {
+                return [
                     'success' => false,
-                    'message' => $e->getMessage(),
+                    'message' => 'File not loaded',
                     'name' => $file->getClientOriginalName()
                 ];
             }
-        }
 
-        return response()->json($response);
+            $file_id = bin2hex(random_bytes(10));
+            $file_name = $this->getFileName($file);
+
+            $file->storeAs('uploads', $file_name);
+            $created_file = File::create([
+                'name' => $file_name,
+                'user_id' => Auth::id(),
+                'file_id' => $file_id
+            ]);
+            Permission::createAuthor(Auth::id(), $created_file->id);
+
+            return [
+                'success' => true,
+                'code' => 200,
+                'message' => 'Success',
+            ] + (new FileResource($created_file))->jsonSerialize();
+        });
     }
 
-    public function edit(Request $request, File $file) {
-        $request->validate([
-            'name' => 'required|unique:files',
-        ]);
-
-        rename($this->getFilePath($file->name), 'uploads/'. $request->name);
-        $file->update(['name' => $request->name]);
+    public function edit(EditFileRequest $request, File $file): JsonResponse
+    {
+        $validated = $request->safe()->only(['name']);
+        rename($this->getFilePath($file->name), $this->getFilePath($validated['name']));
+        $file->update($validated);
 
         return response()->json([
             'success' => true,
@@ -89,8 +90,11 @@ class FileController extends Controller
         ]);
     }
 
-    public function delete(Request $request, File $file) {
-        unlink($this->getFilePath($file->name));
+    public function delete(Request $request, File $file): JsonResponse
+    {
+        if (Storage::exists('uploads/' . $file->name)) {
+            Storage::delete('uploads/' . $file->name);
+        }
         $file->delete();
         return response()->json([
             'success' => true,
@@ -99,7 +103,7 @@ class FileController extends Controller
         ]);
     }
 
-    public function download(Request $request, File $file)
+    public function download(Request $request, File $file): BinaryFileResponse
     {
         return response()->download($this->getFilePath($file->name));
     }
