@@ -17,9 +17,10 @@ class File extends Model
         'user_id'
     ];
 
-    public function users()
+    public function accesses(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'permissions', 'file_id','user_id');
+        return $this->belongsToMany(User::class, 'permissions', 'file_id','user_id')
+            ->withPivot('access_type');
     }
 
 

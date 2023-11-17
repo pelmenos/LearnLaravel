@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\EditFileRequest;
 use App\Http\Requests\StoreFileRequest;
 use App\Http\Resources\FileResource;
+use App\Http\Resources\FileSharedResource;
 use App\Models\File;
 use App\Models\Permission;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -106,5 +109,16 @@ class FileController extends Controller
     public function download(Request $request, File $file): BinaryFileResponse
     {
         return response()->download($this->getFilePath($file->name));
+    }
+
+    public function userFiles(Request $request): AnonymousResourceCollection
+    {
+        $files = File::where('user_id', $request->user()->id)->get();
+        return FileResource::collection($files);
+    }
+
+    public function userAccessFiles(Request $request): AnonymousResourceCollection
+    {
+        return FileSharedResource::collection($request->user()->shared()->get());
     }
 }

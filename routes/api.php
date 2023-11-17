@@ -24,8 +24,8 @@ Route::prefix('files')->middleware('auth:sanctum')->group(function () {
     Route::post('/{file:file_id}/accesses', [PermissionController::class, 'add'])->can('accessesAdd', 'file');;
     Route::delete('/{file:file_id}/accesses', [PermissionController::class, 'delete'])->can('accessesDelete', 'file');;
 
-    Route::get('/disk', [PermissionController::class, 'userFiles']);
-    Route::get('/shared', [PermissionController::class, 'userAccessFiles']);
+    Route::get('/disk', [FileController::class, 'userFiles']);
+    Route::get('/shared', [FileController::class, 'userAccessFiles']);
 
     Route::post('/', [FileController::class, 'store']);
     Route::patch('/{file:file_id}', [FileController::class, 'edit'])->can('update', 'file');;

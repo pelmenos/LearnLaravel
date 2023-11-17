@@ -22,11 +22,6 @@ class Permission extends Model
         return Permission::where('file_id', $id)->get();
     }
 
-    public static function createCoAuthor(int $user_id, int $file_id): void
-    {
-        Permission::create(['user_id' => $user_id, 'file_id' => $file_id, 'access_type' => 'co-author']);
-    }
-
     public static function createAuthor(int $user_id, int $file_id): void
     {
         Permission::create(['user_id' => $user_id, 'file_id' => $file_id, 'access_type' => 'author']);
