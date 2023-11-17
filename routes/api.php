@@ -4,8 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\PermissionController;
-use App\Http\Middleware\IsAuthor;
-use App\Http\Middleware\IsOwner;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -20,13 +19,16 @@ Route::post('/registration', [UserController::class, 'register']);
 Route::post('/login', [UserController::class, 'login']);
 Route::middleware('auth:sanctum')->get('logout', [UserController::class, 'logout']);
 
-Route::middleware(['auth:sanctum', IsOwner::class])->post('/files/{file:file_id}/accesses', [PermissionController::class, 'add']);
-Route::middleware(['auth:sanctum', IsOwner::class])->delete('/files/{file:file_id}/accesses', [PermissionController::class, 'delete']);
-Route::middleware('auth:sanctum')->get('/files/disk', [PermissionController::class, 'userFiles']);
-Route::middleware('auth:sanctum')->get('/files/shared', [PermissionController::class, 'userAccessFiles']);
 
-Route::middleware('auth:sanctum')->post('files', [FileController::class, 'store']);
-Route::middleware(['auth:sanctum', IsOwner::class])->patch('files/{file:file_id}', [FileController::class, 'edit']);
-Route::middleware(['auth:sanctum', IsOwner::class])->delete('files/{file:file_id}', [FileController::class, 'delete']);
-Route::middleware(['auth:sanctum', IsAuthor::class])->get('files/{file:file_id}', [FileController::class, 'download']);
+Route::prefix('files')->middleware('auth:sanctum')->group(function () {
+    Route::post('/{file:file_id}/accesses', [PermissionController::class, 'add'])->can('accessesAdd', 'file');;
+    Route::delete('/{file:file_id}/accesses', [PermissionController::class, 'delete'])->can('accessesDelete', 'file');;
 
+    Route::get('/disk', [PermissionController::class, 'userFiles']);
+    Route::get('/shared', [PermissionController::class, 'userAccessFiles']);
+
+    Route::post('/', [FileController::class, 'store']);
+    Route::patch('/{file:file_id}', [FileController::class, 'edit'])->can('update', 'file');;
+    Route::delete('/{file:file_id}', [FileController::class, 'delete'])->can('destroy', 'file');
+    Route::get('/{file:file_id}', [FileController::class, 'download'])->can('view', 'file');;
+});

@@ -24,7 +24,7 @@ class FileResource extends JsonResource
         return [
             'name' => $this->name,
             'file_id' => $this->file_id,
-            'url' => $_SERVER['HTTP_HOST'] . '/files/' . $this->file_id
+            'url' => config('app.url') . '/files/' . $this->file_id
         ];
     }
 }

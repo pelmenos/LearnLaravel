@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\RegisterUserRequest;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
@@ -13,40 +15,17 @@ use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
 {
-    public function register(Request $request) {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email|unique:users',
-            'first_name' => 'required|min:3',
-            'last_name' => 'required',
-            'password' => ['required', Password::min(3)->mixedCase()->numbers()],
-        ]);
-
-        if ($validator->fails()) {
-            $response = [
-                'success' => false,
-                'message' => $validator->errors(),
-                'code' => 401
-            ];
-            return response()->json($response, 401);
-        }
-
-        $user = User::create($request->all());
-
-        $response['token'] = $user->createToken('MyApp')->plainTextToken;
-        $response['success'] = true;
-        $response['message'] = 'Success';
-        $response['code'] = 200;
-        return response()->json($response, 200);
+    public function register(RegisterUserRequest $request) {
+        $validated = $request->validated();
+        $user = User::create($validated);
+        return new UserResource($user);
     }
 
     public function login(Request $request) {
         if (Auth::attempt($request->all())){
             $user = Auth::user();
-            $response['token'] = $user->createToken('MyApp')->plainTextToken;
-            $response['success'] = true;
-            $response['message'] = 'Success';
-            $response['code'] = 200;
-            return response()->json($response, 200);
+            return new UserResource($user);
+
         } else {
             $response = [
                 'success' => false,
